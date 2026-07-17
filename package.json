@@ -1,6 +1,6 @@
 {
   "name": "@hwong103/github-ai-agent-framework",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A provider-agnostic, Cloudflare-first GitHub issue triage and coding agent framework.",
   "type": "module",
   "license": "MIT",

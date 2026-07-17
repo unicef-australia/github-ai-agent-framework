@@ -28,7 +28,7 @@ describe("workflow security contracts", () => {
   it("installs immutable framework release references", async () => {
     const sources = await workflowSources(resolve("templates/workflows"));
     expect(sources.join("\n")).not.toContain("@main");
-    expect(sources.join("\n")).toContain("@v0.1.0");
+    expect(sources.join("\n")).toContain("@v0.1.1");
   });
 
   it("keeps implementation read-only and publication Draft-only", async () => {

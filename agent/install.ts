@@ -58,8 +58,8 @@ export async function installFramework(
   const target = resolve(options.target);
   const templates = options.templateRoot ?? (await defaultTemplateRoot());
   const replacements = {
-    "@v0.1.0": `@${options.frameworkRef}`,
-    "framework-ref: v0.1.0": `framework-ref: ${options.frameworkRef}`,
+    "@v0.1.1": `@${options.frameworkRef}`,
+    "framework-ref: v0.1.1": `framework-ref: ${options.frameworkRef}`,
   };
   const files: ReadonlyArray<readonly [string, string]> = [
     ["workflows/triage.yml", ".github/workflows/agent-triage.yml"],

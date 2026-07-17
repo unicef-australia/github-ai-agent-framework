@@ -12,9 +12,9 @@
 Run this in the target repository:
 
 ```bash
-npx --yes github:hwong103/github-ai-agent-framework#v0.1.0 install \
+npx --yes github:hwong103/github-ai-agent-framework#v0.1.1 install \
   --target . \
-  --framework-ref v0.1.0
+  --framework-ref v0.1.1
 ```
 
 Use an immutable release tag or full commit SHA for a stable production

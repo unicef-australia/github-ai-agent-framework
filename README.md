@@ -47,12 +47,12 @@ only GitHub Actions and one model provider.
 From a target repository:
 
 ```bash
-npx --yes github:hwong103/github-ai-agent-framework#v0.1.0 install \
+npx --yes github:hwong103/github-ai-agent-framework#v0.1.1 install \
   --target . \
-  --framework-ref v0.1.0
+  --framework-ref v0.1.1
 ```
 
-`v0.1.0` is an immutable release tag; a full commit SHA is also supported. The
+`v0.1.1` is an immutable release tag; a full commit SHA is also supported. The
 installer does not overwrite existing files unless `--force true` is supplied.
 
 Then:
@@ -135,7 +135,7 @@ The full configuration reference is in
 - PRs are always created with `draft: true`; no merge API exists in the
   framework.
 - Framework release refs and third-party Actions are pinned; installed wrappers
-  default to the immutable `v0.1.0` release.
+  default to the immutable `v0.1.1` release.
 
 Read [SECURITY.md](SECURITY.md) before enabling implementation in a sensitive
 repository.

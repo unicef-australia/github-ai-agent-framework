@@ -184,7 +184,7 @@ async function install(
 ): Promise<void> {
   const results = await installFramework({
     target: options.target ?? ".",
-    frameworkRef: options["framework-ref"] ?? "v0.1.0",
+    frameworkRef: options["framework-ref"] ?? "v0.1.1",
     force: options.force === "true",
   });
   console.log(JSON.stringify(results, null, 2));
