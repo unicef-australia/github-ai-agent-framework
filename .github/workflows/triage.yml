@@ -1,0 +1,185 @@
+name: Reusable AI issue triage
+
+on:
+  workflow_call:
+    inputs:
+      issue-number:
+        description: Issue number from the calling event
+        required: true
+        type: number
+      framework-ref:
+        description: Immutable framework tag or SHA
+        required: false
+        default: main
+        type: string
+    secrets:
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_AI_GATEWAY_ID:
+        required: false
+      OPENAI_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+
+jobs:
+  analyze:
+    name: Analyze without write credentials
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Check out target repository
+        uses: actions/checkout@v4
+        with:
+          path: target
+          persist-credentials: false
+
+      - name: Check out trusted framework
+        uses: actions/checkout@v4
+        with:
+          repository: hwong103/github-ai-agent-framework
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: framework/package-lock.json
+
+      - name: Build framework
+        working-directory: framework
+        run: npm ci && npm run build
+
+      - name: Analyze issue
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_AI_GATEWAY_ID: ${{ secrets.CLOUDFLARE_AI_GATEWAY_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: >-
+          node framework/dist/agent/cli.js triage --repo target --event
+          "$GITHUB_EVENT_PATH" --repository "$GITHUB_REPOSITORY" --output
+          artifacts/triage-result.json
+
+      - name: Upload validated triage result
+        uses: actions/upload-artifact@v4
+        with:
+          name: triage-result-${{ inputs.issue-number }}
+          path: artifacts/triage-result.json
+          if-no-files-found: error
+          retention-days: 7
+
+  mutate:
+    name: Apply trusted labels and comment
+    needs: analyze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out trusted framework
+        uses: actions/checkout@v4
+        with:
+          repository: hwong103/github-ai-agent-framework
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: framework/package-lock.json
+
+      - name: Build framework
+        working-directory: framework
+        run: npm ci && npm run build
+
+      - name: Download triage result
+        uses: actions/download-artifact@v4
+        with:
+          name: triage-result-${{ inputs.issue-number }}
+          path: artifacts
+
+      - name: Revalidate artifact against trusted event data
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js validate-triage --input
+          artifacts/triage-result.json --output artifacts/trusted-triage.json
+          --repository "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
+      - name: Apply labels and upsert summary comment
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+          TRIAGE_ARTIFACT: artifacts/trusted-triage.json
+        with:
+          script: |
+            const fs = require("node:fs");
+            const artifact = JSON.parse(fs.readFileSync(process.env.TRIAGE_ARTIFACT, "utf8"));
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            const { owner, repo } = context.repo;
+            const definitions = {
+              "needs-agent-triage": ["BFDADC", "Awaiting automated issue analysis"],
+              "needs-discussion": ["D4C5F9", "More human discussion or detail is required"],
+              "ready-for-agent": ["0E8A16", "Bounded enough for human implementation approval"],
+              "wontfix": ["FFFFFF", "Not planned for implementation"],
+              "agent-approved": ["1D76DB", "Human approved AI implementation"],
+            };
+
+            for (const [name, [color, description]] of Object.entries(definitions)) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ owner, repo, name, color, description });
+              }
+            }
+
+            for (const name of artifact.labels.remove) {
+              try {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number, name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: artifact.labels.add,
+            });
+
+            const marker = "<!-- github-ai-agent-framework:triage -->";
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body: artifact.comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: artifact.comment,
+              });
+            }
