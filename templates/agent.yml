@@ -1,0 +1,68 @@
+version: 1
+
+triage:
+  provider: cloudflare
+  model: "@cf/moonshotai/kimi-k2.7-code"
+  max_tokens: 4096
+  temperature: 0
+
+implementation:
+  provider: cloudflare
+  model: "moonshotai/kimi-k3"
+  max_tokens: 16384
+  temperature: 0
+  max_steps: 40
+
+review:
+  provider: cloudflare
+  model: "@cf/moonshotai/kimi-k2.7-code"
+  max_tokens: 8192
+  temperature: 0
+
+limits:
+  max_changed_files: 8
+  max_patch_lines: 1500
+  allow_dependency_changes: false
+  allow_workflow_changes: false
+  protected_paths:
+    - ".github/workflows/"
+    - ".env"
+    - ".env.*"
+    - ".git"
+
+# Replace these examples with exact commands that are safe for this repository.
+# At least one required command must have kind: test.
+commands:
+  - name: install
+    kind: install
+    run: npm ci
+    required: true
+    timeout_minutes: 10
+  - name: format
+    kind: format
+    run: npm run format:check
+    required: true
+    timeout_minutes: 5
+  - name: lint
+    kind: lint
+    run: npm run lint
+    required: true
+    timeout_minutes: 5
+  - name: test
+    kind: test
+    run: npm test
+    required: true
+    timeout_minutes: 10
+  - name: build
+    kind: build
+    run: npm run build
+    required: true
+    timeout_minutes: 10
+
+context:
+  include:
+    - AGENTS.md
+    - CONTEXT.md
+    - README.md
+    - docs/
+  max_bytes: 250000

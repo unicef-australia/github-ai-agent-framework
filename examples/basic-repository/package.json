@@ -1,0 +1,16 @@
+{
+  "name": "github-ai-agent-framework-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --check src/greet.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "node --check src/greet.js && node --check test/greet.test.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "prettier": "3.9.5"
+  }
+}

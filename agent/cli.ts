@@ -14,6 +14,7 @@ import { createProvider } from "./providers/registry.js";
 import { loadAgentConfig } from "./config/load.js";
 import { issueContextFromEvent } from "./validation/events.js";
 import { validateTriageArtifact } from "./validation/artifacts.js";
+import { installFramework } from "./install.js";
 
 interface Arguments {
   readonly command: string;
@@ -169,9 +170,23 @@ async function validatePublish(
   });
 }
 
+async function install(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  const results = await installFramework({
+    target: options.target ?? ".",
+    frameworkRef: options["framework-ref"] ?? "main",
+    force: options.force === "true",
+  });
+  console.log(JSON.stringify(results, null, 2));
+}
+
 async function main(): Promise<void> {
   const { command, options } = parseArguments(process.argv.slice(2));
   switch (command) {
+    case "install":
+      await install(options);
+      break;
     case "triage":
       await triage(options);
       break;

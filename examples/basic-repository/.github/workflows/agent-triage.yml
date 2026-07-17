@@ -1,0 +1,20 @@
+name: AI issue triage
+
+on:
+  issues:
+    types: [opened, reopened, edited]
+
+concurrency:
+  group: ai-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    uses: hwong103/github-ai-agent-framework/.github/workflows/triage.yml@main
+    permissions:
+      contents: read
+      issues: write
+    with:
+      issue-number: ${{ github.event.issue.number }}
+      framework-ref: main
+    secrets: inherit
