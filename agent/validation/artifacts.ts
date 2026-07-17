@@ -99,3 +99,28 @@ export const implementationReportSchema = z
   .strict();
 
 export type ImplementationReport = z.infer<typeof implementationReportSchema>;
+
+export const publisherVerificationSchema = z
+  .object({
+    schema_version: z.literal(1),
+    repository: z.string().regex(/^[^/]+\/[^/]+$/),
+    issue_number: z.number().int().positive(),
+    base_sha: z.string().regex(/^[0-9a-f]{40}$/),
+    patch_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    report_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    verified_at: z.iso.datetime(),
+    passed: z.literal(true),
+    commands: z.array(
+      z.object({
+        name: z.string(),
+        kind: z.string(),
+        run: z.string(),
+        exit_code: z.literal(0),
+        duration_ms: z.number().nonnegative(),
+        output: z.string(),
+      }),
+    ),
+  })
+  .strict();
+
+export type PublisherVerification = z.infer<typeof publisherVerificationSchema>;

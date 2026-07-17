@@ -6,6 +6,10 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 import { runImplementation } from "../agent/core/implementation.js";
+import {
+  validateBundleForPublish,
+  verifyImplementationBundle,
+} from "../agent/core/publisher.js";
 import type { AIProvider, ChatResponse } from "../agent/types.js";
 
 const execute = promisify(execFile);
@@ -109,5 +113,28 @@ commands:
       await readFile(join(output, "implementation.patch"), "utf8"),
     ).toContain("+new");
     expect(await git(root, "rev-parse", "HEAD")).toBe(originalSha);
+
+    const verifyRoot = await mkdtemp(join(tmpdir(), "publisher-verify-"));
+    await execute("git", ["clone", "--quiet", root, verifyRoot]);
+    const verificationPath = join(output, "publisher-verification.json");
+    const verification = await verifyImplementationBundle({
+      repositoryRoot: verifyRoot,
+      bundleDirectory: output,
+      outputPath: verificationPath,
+      expected: { repository: "owner/repository", issue_number: 7 },
+      now: () => new Date("2026-07-17T00:01:00.000Z"),
+    });
+    expect(verification.passed).toBe(true);
+
+    const publishRoot = await mkdtemp(join(tmpdir(), "publisher-write-"));
+    await execute("git", ["clone", "--quiet", root, publishRoot]);
+    const metadata = await validateBundleForPublish({
+      repositoryRoot: publishRoot,
+      bundleDirectory: output,
+      verificationPath,
+      outputPath: join(output, "publish-metadata.json"),
+      expected: { repository: "owner/repository", issue_number: 7 },
+    });
+    expect(metadata.branch).toMatch(/^agent\/issue-7-[0-9a-f]{12}$/);
   });
 });

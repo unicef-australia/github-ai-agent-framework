@@ -4,6 +4,12 @@ import { dirname, resolve } from "node:path";
 
 import { runTriage } from "./core/triage.js";
 import { runImplementation } from "./core/implementation.js";
+import {
+  inspectImplementationReport,
+  inspectPublisherVerification,
+  validateBundleForPublish,
+  verifyImplementationBundle,
+} from "./core/publisher.js";
 import { createProvider } from "./providers/registry.js";
 import { loadAgentConfig } from "./config/load.js";
 import { issueContextFromEvent } from "./validation/events.js";
@@ -104,6 +110,65 @@ async function implement(
   });
 }
 
+function expectedIdentity(options: Readonly<Record<string, string>>): {
+  repository: string;
+  issue_number: number;
+} {
+  const repository = required(options, "repository");
+  const issueNumber = Number(required(options, "issue-number"));
+  if (!Number.isSafeInteger(issueNumber) || issueNumber <= 0) {
+    throw new Error("--issue-number must be a positive integer");
+  }
+  return { repository, issue_number: issueNumber };
+}
+
+async function inspectReport(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  await writeJson(
+    required(options, "output"),
+    inspectImplementationReport(
+      await readJson(required(options, "input")),
+      expectedIdentity(options),
+    ),
+  );
+}
+
+async function verifyBundle(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  await verifyImplementationBundle({
+    repositoryRoot: resolve(required(options, "repo")),
+    bundleDirectory: resolve(required(options, "bundle")),
+    outputPath: resolve(required(options, "output")),
+    expected: expectedIdentity(options),
+  });
+}
+
+async function inspectVerification(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  await writeJson(
+    required(options, "output"),
+    inspectPublisherVerification(
+      await readJson(required(options, "input")),
+      expectedIdentity(options),
+    ),
+  );
+}
+
+async function validatePublish(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  await validateBundleForPublish({
+    repositoryRoot: resolve(required(options, "repo")),
+    bundleDirectory: resolve(required(options, "bundle")),
+    verificationPath: resolve(required(options, "verification")),
+    outputPath: resolve(required(options, "output")),
+    expected: expectedIdentity(options),
+  });
+}
+
 async function main(): Promise<void> {
   const { command, options } = parseArguments(process.argv.slice(2));
   switch (command) {
@@ -115,6 +180,18 @@ async function main(): Promise<void> {
       break;
     case "validate-triage":
       await validateTriage(options);
+      break;
+    case "inspect-report":
+      await inspectReport(options);
+      break;
+    case "verify-bundle":
+      await verifyBundle(options);
+      break;
+    case "inspect-verification":
+      await inspectVerification(options);
+      break;
+    case "validate-publish":
+      await validatePublish(options);
       break;
     default:
       throw new Error(`Unknown command: ${command}`);

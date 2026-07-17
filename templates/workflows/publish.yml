@@ -1,0 +1,26 @@
+name: Publish verified AI implementation
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue-number:
+        description: Approved issue number
+        required: true
+        type: number
+      implementation-run-id:
+        description: Successful implementation workflow run ID
+        required: true
+        type: number
+
+jobs:
+  publish:
+    uses: hwong103/github-ai-agent-framework/.github/workflows/publish.yml@main
+    permissions:
+      actions: read
+      contents: write
+      issues: read
+      pull-requests: write
+    with:
+      issue-number: ${{ inputs.issue-number }}
+      implementation-run-id: ${{ inputs.implementation-run-id }}
+      framework-ref: main

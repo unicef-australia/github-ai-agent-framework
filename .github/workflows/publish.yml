@@ -1,0 +1,219 @@
+name: Reusable trusted Draft PR publisher
+
+on:
+  workflow_call:
+    inputs:
+      issue-number:
+        description: Approved issue number
+        required: true
+        type: number
+      implementation-run-id:
+        description: Run ID containing the implementation bundle
+        required: true
+        type: number
+      framework-ref:
+        description: Immutable framework tag or SHA
+        required: false
+        default: main
+        type: string
+
+jobs:
+  verify:
+    name: Reapply patch and rerun tests without write credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+    steps:
+      - name: Confirm human approval is still present
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        with:
+          script: |
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            const issue = await github.rest.issues.get({ ...context.repo, issue_number });
+            const labels = issue.data.labels.map((label) =>
+              typeof label === "string" ? label : label.name,
+            );
+            if (!labels.includes("agent-approved")) {
+              core.setFailed("Issue no longer has the human-applied agent-approved label");
+            }
+
+      - name: Check out trusted framework
+        uses: actions/checkout@v4
+        with:
+          repository: hwong103/github-ai-agent-framework
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: framework/package-lock.json
+
+      - name: Build framework
+        working-directory: framework
+        run: npm ci && npm run build
+
+      - name: Download implementation bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: implementation-${{ inputs.issue-number }}
+          path: bundle
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.implementation-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Inspect report identity
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js inspect-report --input
+          bundle/report.json --output bundle/inspection.json --repository
+          "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
+      - name: Select recorded base commit
+        id: report
+        run:
+          echo "base-sha=$(jq -r .base_sha bundle/inspection.json)" >>
+          "$GITHUB_OUTPUT"
+
+      - name: Check out exact target base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.report.outputs.base-sha }}
+          path: target
+          persist-credentials: false
+
+      - name: Verify patch and rerun required commands
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js verify-bundle --repo target --bundle
+          bundle --output bundle/publisher-verification.json --repository
+          "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
+      - name: Upload trusted verified bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name:
+            verified-implementation-${{ inputs.issue-number }}-${{ github.run_id
+            }}
+          path: |
+            bundle/implementation.patch
+            bundle/pr-body.md
+            bundle/report.json
+            bundle/publisher-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish branch and Draft PR
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Download verified bundle
+        uses: actions/download-artifact@v4
+        with:
+          name:
+            verified-implementation-${{ inputs.issue-number }}-${{ github.run_id
+            }}
+          path: verified
+
+      - name: Check out trusted framework
+        uses: actions/checkout@v4
+        with:
+          repository: hwong103/github-ai-agent-framework
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: framework/package-lock.json
+
+      - name: Build framework
+        working-directory: framework
+        run: npm ci && npm run build
+
+      - name: Inspect publisher verification
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js inspect-verification --input
+          verified/publisher-verification.json --output verified/inspection.json
+          --repository "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
+      - name: Select verified base commit
+        id: verification
+        run:
+          echo "base-sha=$(jq -r .base_sha verified/inspection.json)" >>
+          "$GITHUB_OUTPUT"
+
+      - name: Check out exact target base with publisher credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.verification.outputs.base-sha }}
+          path: target
+          persist-credentials: true
+
+      - name: Revalidate exact bundle before mutation
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js validate-publish --repo target
+          --bundle verified --verification verified/publisher-verification.json
+          --output verified/publish-metadata.json --repository
+          "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
+      - name: Select trusted branch metadata
+        id: metadata
+        run:
+          echo "branch=$(jq -r .branch verified/publish-metadata.json)" >>
+          "$GITHUB_OUTPUT"
+
+      - name: Apply, commit, and push verified patch
+        env:
+          BRANCH: ${{ steps.metadata.outputs.branch }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: |
+          git -C target switch -c "$BRANCH"
+          git -C target apply --index --whitespace=error "$GITHUB_WORKSPACE/verified/implementation.patch"
+          git -C target config user.name "github-actions[bot]"
+          git -C target config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C target commit -m "Implement approved issue #$ISSUE_NUMBER"
+          git -C target push --set-upstream origin "$BRANCH"
+
+      - name: Open Draft Pull Request
+        uses: actions/github-script@v7
+        env:
+          BRANCH: ${{ steps.metadata.outputs.branch }}
+          PR_BODY_PATH: verified/pr-body.md
+          PR_METADATA_PATH: verified/publish-metadata.json
+        with:
+          script: |
+            const fs = require("node:fs");
+            const body = fs.readFileSync(process.env.PR_BODY_PATH, "utf8");
+            const metadata = JSON.parse(fs.readFileSync(process.env.PR_METADATA_PATH, "utf8"));
+            const result = await github.rest.pulls.create({
+              ...context.repo,
+              head: process.env.BRANCH,
+              base: context.payload.repository.default_branch,
+              title: metadata.pr_title,
+              body,
+              draft: true,
+            });
+            core.notice(`Opened Draft PR #${result.data.number}: ${result.data.html_url}`);
