@@ -11,11 +11,11 @@ concurrency:
 jobs:
   implement:
     if: github.event.label.name == 'agent-approved'
-    uses: hwong103/github-ai-agent-framework/.github/workflows/implement.yml@main
+    uses: hwong103/github-ai-agent-framework/.github/workflows/implement.yml@v0.1.0
     permissions:
       contents: read
       issues: read
     with:
       issue-number: ${{ github.event.issue.number }}
-      framework-ref: main
+      framework-ref: v0.1.0
     secrets: inherit

@@ -38,4 +38,15 @@ describe("patch validation", () => {
       "diff --git a/image.png b/image.png\nGIT binary patch\nliteral 0\n";
     expect(() => validatePatch(binaryPatch, config)).toThrow("Binary patches");
   });
+
+  it("rejects renaming a protected source to an unprotected destination", () => {
+    const renamePatch = [
+      "diff --git a/.env b/safe-name",
+      "similarity index 100%",
+      "rename from .env",
+      "rename to safe-name",
+      "",
+    ].join("\n");
+    expect(() => validatePatch(renamePatch, config)).toThrow("protected");
+  });
 });

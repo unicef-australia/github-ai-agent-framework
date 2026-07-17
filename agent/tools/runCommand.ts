@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { basename } from "node:path";
 
 import type { AgentCommand } from "../config/schema.js";
 import type { ProviderEnvironment } from "../types.js";
@@ -14,6 +15,7 @@ const forbiddenExecutables = new Set([
   "cmd.exe",
   "powershell",
   "pwsh",
+  "env",
 ]);
 
 function splitCommand(command: string): readonly string[] {
@@ -80,7 +82,10 @@ export async function runCommand(
   environment: ProviderEnvironment,
 ): Promise<ToolResult> {
   const [executable, ...args] = splitCommand(command.run);
-  if (!executable || forbiddenExecutables.has(executable.toLowerCase())) {
+  if (
+    !executable ||
+    forbiddenExecutables.has(basename(executable).toLowerCase())
+  ) {
     throw new Error(
       `Shell executables are not allowed: ${executable ?? "unknown"}`,
     );

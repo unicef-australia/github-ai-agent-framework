@@ -1,4 +1,4 @@
-import { lstat, readdir, readFile, realpath } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
 
 import type { AgentConfig } from "../config/schema.js";
@@ -11,7 +11,7 @@ const ignoredDirectories = new Set([
   "artifacts",
 ]);
 
-interface ContextFile {
+export interface ContextFile {
   readonly path: string;
   readonly content: string;
 }
@@ -72,6 +72,8 @@ export async function collectRepositoryContext(
   const files: ContextFile[] = [];
   let totalBytes = 0;
   for (const absolute of unique) {
+    const details = await stat(absolute);
+    if (totalBytes + details.size > config.context.max_bytes) continue;
     const content = await readFile(absolute, "utf8");
     const byteLength = Buffer.byteLength(content);
     if (totalBytes + byteLength > config.context.max_bytes) break;
@@ -79,6 +81,45 @@ export async function collectRepositoryContext(
     totalBytes += byteLength;
   }
   return files;
+}
+
+export async function collectRepositoryInstructions(
+  repositoryRoot: string,
+  maxBytes: number,
+): Promise<readonly ContextFile[]> {
+  const root = await realpath(repositoryRoot);
+  const paths: string[] = [];
+
+  async function visit(directory: string): Promise<void> {
+    const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      if (entry.isSymbolicLink() || ignoredDirectories.has(entry.name))
+        continue;
+      const absolute = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(absolute);
+      } else if (entry.isFile() && entry.name === "AGENTS.md") {
+        paths.push(absolute);
+      }
+    }
+  }
+
+  await visit(root);
+  const instructions: ContextFile[] = [];
+  let totalBytes = 0;
+  for (const absolute of paths.sort()) {
+    const details = await stat(absolute);
+    if (totalBytes + details.size > maxBytes) {
+      throw new Error(
+        "Repository instruction files exceed the context byte limit",
+      );
+    }
+    const content = await readFile(absolute, "utf8");
+    instructions.push({ path: relative(root, absolute), content });
+    totalBytes += details.size;
+  }
+  return instructions;
 }
 
 export function formatRepositoryContext(files: readonly ContextFile[]): string {

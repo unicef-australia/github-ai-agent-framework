@@ -14,7 +14,7 @@ on:
       framework-ref:
         description: Immutable framework tag or SHA
         required: false
-        default: main
+        default: v0.1.0
         type: string
 
 jobs:
@@ -27,23 +27,8 @@ jobs:
       contents: read
       issues: read
     steps:
-      - name: Confirm human approval is still present
-        uses: actions/github-script@v7
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue-number }}
-        with:
-          script: |
-            const issue_number = Number(process.env.ISSUE_NUMBER);
-            const issue = await github.rest.issues.get({ ...context.repo, issue_number });
-            const labels = issue.data.labels.map((label) =>
-              typeof label === "string" ? label : label.name,
-            );
-            if (!labels.includes("agent-approved")) {
-              core.setFailed("Issue no longer has the human-applied agent-approved label");
-            }
-
       - name: Check out trusted framework
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: hwong103/github-ai-agent-framework
           ref: ${{ inputs.framework-ref }}
@@ -51,7 +36,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -61,8 +46,16 @@ jobs:
         working-directory: framework
         run: npm ci && npm run build
 
+      - name: Confirm latest approval was applied by a human
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js check-approval --repository
+          "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
       - name: Download implementation bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: implementation-${{ inputs.issue-number }}
           path: bundle
@@ -85,7 +78,7 @@ jobs:
           "$GITHUB_OUTPUT"
 
       - name: Check out exact target base
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ steps.report.outputs.base-sha }}
           path: target
@@ -100,7 +93,7 @@ jobs:
           "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
 
       - name: Upload trusted verified bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name:
             verified-implementation-${{ inputs.issue-number }}-${{ github.run_id
@@ -120,10 +113,11 @@ jobs:
     permissions:
       actions: read
       contents: write
+      issues: read
       pull-requests: write
     steps:
       - name: Download verified bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name:
             verified-implementation-${{ inputs.issue-number }}-${{ github.run_id
@@ -131,7 +125,7 @@ jobs:
           path: verified
 
       - name: Check out trusted framework
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: hwong103/github-ai-agent-framework
           ref: ${{ inputs.framework-ref }}
@@ -139,7 +133,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -164,7 +158,7 @@ jobs:
           "$GITHUB_OUTPUT"
 
       - name: Check out exact target base with publisher credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ steps.verification.outputs.base-sha }}
           path: target
@@ -177,6 +171,14 @@ jobs:
           node framework/dist/agent/cli.js validate-publish --repo target
           --bundle verified --verification verified/publisher-verification.json
           --output verified/publish-metadata.json --repository
+          "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
+
+      - name: Reconfirm human approval immediately before publication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: >-
+          node framework/dist/agent/cli.js check-approval --repository
           "$GITHUB_REPOSITORY" --issue-number "$ISSUE_NUMBER"
 
       - name: Select trusted branch metadata
@@ -198,7 +200,7 @@ jobs:
           git -C target push --set-upstream origin "$BRANCH"
 
       - name: Open Draft Pull Request
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           BRANCH: ${{ steps.metadata.outputs.branch }}
           PR_BODY_PATH: verified/pr-body.md

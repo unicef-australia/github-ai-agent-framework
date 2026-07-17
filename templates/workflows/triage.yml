@@ -10,11 +10,11 @@ concurrency:
 
 jobs:
   triage:
-    uses: hwong103/github-ai-agent-framework/.github/workflows/triage.yml@main
+    uses: hwong103/github-ai-agent-framework/.github/workflows/triage.yml@v0.1.0
     permissions:
       contents: read
       issues: write
     with:
       issue-number: ${{ github.event.issue.number }}
-      framework-ref: main
+      framework-ref: v0.1.0
     secrets: inherit

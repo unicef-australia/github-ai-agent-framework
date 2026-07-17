@@ -25,6 +25,20 @@ const config = {
   },
   commands: [
     {
+      name: "format",
+      kind: "format",
+      run: "npm run format:check",
+      required: true,
+      timeout_minutes: 10,
+    },
+    {
+      name: "lint",
+      kind: "lint",
+      run: "npm run lint",
+      required: true,
+      timeout_minutes: 10,
+    },
+    {
       name: "test",
       kind: "test",
       run: "npm test",
@@ -45,6 +59,11 @@ function reportFor(patchSource: string): unknown {
     model: "model",
     pr_title: "Update value",
     summary: "Updates the value.",
+    approval: {
+      label: "agent-approved",
+      actor: "reviewer",
+      actor_type: "User",
+    },
     plan: {
       schema_version: 1,
       summary: "Update value.",
@@ -60,6 +79,22 @@ function reportFor(patchSource: string): unknown {
     verification: {
       passed: true,
       commands: [
+        {
+          name: "format",
+          kind: "format",
+          run: "npm run format:check",
+          exit_code: 0,
+          duration_ms: 100,
+          output: "passed",
+        },
+        {
+          name: "lint",
+          kind: "lint",
+          run: "npm run lint",
+          exit_code: 0,
+          duration_ms: 100,
+          output: "passed",
+        },
         {
           name: "test",
           kind: "test",

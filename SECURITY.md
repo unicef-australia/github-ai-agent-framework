@@ -30,7 +30,7 @@ as a security boundary by itself.
 The publisher checks:
 
 1. the requested repository and issue;
-2. the current `agent-approved` label;
+2. the current `agent-approved` label and the latest label event's human actor;
 3. the recorded 40-character base SHA;
 4. report and patch schemas;
 5. patch/report digests and changed-file agreement;
@@ -48,7 +48,7 @@ Only then can the publisher create a branch and Draft PR. It has no merge step.
   access. It receives no framework credentials, but runner network isolation is
   outside this release's scope.
 - A compromised pinned framework ref or GitHub Action dependency can compromise
-  its workflow. Use immutable refs and review updates.
+  its workflow. Release refs and Actions are pinned; review every update.
 - GitHub-hosted runners and artifact infrastructure remain part of the trusted
   computing base.
 - Model-generated code can still contain subtle defects. Required tests and a

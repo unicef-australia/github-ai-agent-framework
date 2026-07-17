@@ -62,6 +62,13 @@ export const implementationReportSchema = z
     model: z.string().min(1),
     pr_title: z.string().min(1).max(200),
     summary: z.string().min(1).max(4_000),
+    approval: z
+      .object({
+        label: z.literal("agent-approved"),
+        actor: z.string().min(1),
+        actor_type: z.literal("User"),
+      })
+      .strict(),
     plan: z.object({
       schema_version: z.literal(1),
       summary: z.string(),

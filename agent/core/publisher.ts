@@ -3,7 +3,10 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { loadAgentConfig } from "../config/load.js";
-import type { AgentConfig } from "../config/schema.js";
+import {
+  validateRequiredCommandKinds,
+  type AgentConfig,
+} from "../config/schema.js";
 import { RepositoryTools } from "../tools/repository-tools.js";
 import type { ToolResult } from "../tools/types.js";
 import {
@@ -43,7 +46,7 @@ export function validateImplementationBundle(
   source: BundleSource,
   config: AgentConfig,
   expected: ExpectedBundleIdentity,
-): { readonly report: ImplementationReport; readonly reportSource: string } {
+): { readonly report: ImplementationReport } {
   const report = implementationReportSchema.parse(source.report);
   if (
     report.repository !== expected.repository ||
@@ -83,11 +86,7 @@ export function validateImplementationBundle(
     );
   }
   const required = config.commands.filter((command) => command.required);
-  if (!required.some((command) => command.kind === "test")) {
-    throw new Error(
-      "Repository policy does not define a required test command",
-    );
-  }
+  validateRequiredCommandKinds(config);
   for (const command of required) {
     const result = report.verification.commands.find(
       (candidate) => candidate.name === command.name,
@@ -103,7 +102,7 @@ export function validateImplementationBundle(
       );
     }
   }
-  return { report, reportSource: `${JSON.stringify(report, null, 2)}\n` };
+  return { report };
 }
 
 async function readBounded(path: string): Promise<string> {

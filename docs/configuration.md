@@ -18,13 +18,13 @@ security settings do not silently fall back.
 
 ## Limits
 
-| Key                        | Default posture                |
-| -------------------------- | ------------------------------ |
-| `max_changed_files`        | Small, reviewable patch        |
-| `max_patch_lines`          | Bounded text patch             |
-| `allow_dependency_changes` | `false`                        |
-| `allow_workflow_changes`   | `false`                        |
-| `protected_paths`          | Workflows, `.env*`, and `.git` |
+| Key                        | Default posture                                           |
+| -------------------------- | --------------------------------------------------------- |
+| `max_changed_files`        | Small, reviewable patch                                   |
+| `max_patch_lines`          | Bounded text patch                                        |
+| `allow_dependency_changes` | `false`                                                   |
+| `allow_workflow_changes`   | `false`                                                   |
+| `protected_paths`          | Workflows, agent policy/instructions, `.env*`, and `.git` |
 
 Binary patches and quoted Git paths are rejected. Dependency protection covers
 common JavaScript, Python, Go, Rust, Ruby, and Bun manifests/lockfiles.
@@ -43,7 +43,8 @@ Each command has:
 
 The model requests `run_command` with only `name`. The framework looks up the
 exact trusted string, parses arguments, and launches the executable with
-`shell: false`. Shell executables are rejected. Required commands run before an
+`shell: false`. Shell executables are rejected, including absolute paths and
+`env` indirection. Required format, lint, and test commands run before an
 implementation bundle is produced and again in the publisher's read-only
 verification job.
 

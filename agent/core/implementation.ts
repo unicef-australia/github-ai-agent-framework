@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { loadAgentConfig } from "../config/load.js";
+import { validateRequiredCommandKinds } from "../config/schema.js";
 import { createProvider } from "../providers/registry.js";
 import { RepositoryTools } from "../tools/repository-tools.js";
 import type { ToolResult } from "../tools/types.js";
@@ -10,7 +11,7 @@ import {
   implementationReportSchema,
   type ImplementationReport,
 } from "../validation/artifacts.js";
-import type { IssueContext } from "../validation/events.js";
+import type { HumanApproval, IssueContext } from "../validation/events.js";
 import {
   parseImplementationAction,
   parseImplementationPlan,
@@ -18,6 +19,7 @@ import {
 import { validatePatch } from "../validation/patch.js";
 import {
   collectRepositoryContext,
+  collectRepositoryInstructions,
   formatRepositoryContext,
 } from "./context.js";
 import { capturePatch, requireCleanRepository } from "./git.js";
@@ -28,6 +30,7 @@ export interface RunImplementationOptions {
   readonly outputDirectory: string;
   readonly repository: string;
   readonly issue: IssueContext;
+  readonly approval: HumanApproval;
   readonly provider?: AIProvider;
   readonly now?: () => Date;
 }
@@ -98,23 +101,7 @@ export async function runImplementation(
     );
   }
   const config = await loadAgentConfig(options.repositoryRoot);
-  if (
-    !config.commands.some(
-      (command) => command.required && command.kind === "test",
-    )
-  ) {
-    throw new Error("At least one required test command must be configured");
-  }
-  const agentsPath = resolve(options.repositoryRoot, "AGENTS.md");
-  let agentsInstructions: string;
-  try {
-    agentsInstructions = await readFile(agentsPath, "utf8");
-  } catch (error) {
-    throw new Error("AGENTS.md is required before implementation", {
-      cause: error,
-    });
-  }
-
+  validateRequiredCommandKinds(config);
   const baseSha = await requireCleanRepository(options.repositoryRoot);
   const provider =
     options.provider ??
@@ -124,14 +111,21 @@ export async function runImplementation(
     config,
     process.env,
   );
-  const [prompt, contextFiles] = await Promise.all([
+  const [prompt, contextFiles, instructionFiles] = await Promise.all([
     loadPrompt("implementation.md"),
     collectRepositoryContext(options.repositoryRoot, config),
+    collectRepositoryInstructions(
+      options.repositoryRoot,
+      config.context.max_bytes,
+    ),
   ]);
+  if (!instructionFiles.some((file) => file.path === "AGENTS.md")) {
+    throw new Error("Root AGENTS.md is required before implementation");
+  }
   const system = `${prompt}\n${protocolDescription(config.commands)}\nPOLICY\n${JSON.stringify(config.limits)}`;
   const issueAndContext = [
     `ISSUE\n${JSON.stringify(options.issue, null, 2)}`,
-    `AGENTS.md\n${agentsInstructions}`,
+    `REPOSITORY INSTRUCTIONS\n${formatRepositoryContext(instructionFiles)}`,
     `REPOSITORY CONTEXT\n${formatRepositoryContext(contextFiles)}`,
   ].join("\n\n");
   const planResponse = await provider.chat({
@@ -221,6 +215,7 @@ export async function runImplementation(
       model: response.model ?? config.implementation.model,
       pr_title: action.pr_title,
       summary: action.summary,
+      approval: options.approval,
       plan,
       changed_files: validatedPatch.changed_files,
       patch: {

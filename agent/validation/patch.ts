@@ -18,7 +18,7 @@ export function validatePatch(
       "Binary patches are not supported by the trusted publisher",
     );
   }
-  const files = [...patch.matchAll(/^diff --git a\/(.+) b\/(.+)$/gm)].map(
+  const pathPairs = [...patch.matchAll(/^diff --git a\/(.+) b\/(.+)$/gm)].map(
     (match) => {
       const before = match[1];
       const after = match[2];
@@ -30,10 +30,21 @@ export function validatePatch(
       ) {
         throw new Error("Quoted or malformed patch paths are not supported");
       }
-      return after;
+      for (const path of [before, after]) {
+        if (
+          path.includes("\0") ||
+          path.startsWith("/") ||
+          path === ".." ||
+          path.startsWith("../") ||
+          path.includes("/../")
+        ) {
+          throw new Error(`Unsafe patch path: ${path}`);
+        }
+      }
+      return { before, after };
     },
   );
-  const changedFiles = [...new Set(files)];
+  const changedFiles = [...new Set(pathPairs.map(({ after }) => after))];
   if (changedFiles.length === 0)
     throw new Error("Patch contains no changed files");
   if (changedFiles.length > config.limits.max_changed_files) {
@@ -47,7 +58,10 @@ export function validatePatch(
       `Patch has ${lines} lines; limit is ${config.limits.max_patch_lines}`,
     );
   }
-  for (const path of changedFiles) {
+  const touchedPaths = new Set(
+    pathPairs.flatMap(({ before, after }) => [before, after]),
+  );
+  for (const path of touchedPaths) {
     if (isProtectedPath(path, config)) {
       throw new Error(`Patch modifies protected path: ${path}`);
     }

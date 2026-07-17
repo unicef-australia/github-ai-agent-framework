@@ -26,6 +26,9 @@ limits:
   allow_workflow_changes: false
   protected_paths:
     - ".github/workflows/"
+    - ".github/agent.yml"
+    - "AGENTS.md"
+    - "*/AGENTS.md"
     - ".env"
     - ".env.*"
     - ".git"

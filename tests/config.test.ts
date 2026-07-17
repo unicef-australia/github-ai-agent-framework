@@ -35,6 +35,9 @@ limits:
 
     expect(config.triage.model).toBe("@cf/moonshotai/kimi-k2.7-code");
     expect(config.limits.protected_paths).toContain(".github/workflows/");
+    expect(config.limits.protected_paths).toContain(".github/agent.yml");
+    expect(config.limits.protected_paths).toContain("AGENTS.md");
+    expect(config.limits.protected_paths).toContain("*/AGENTS.md");
     expect(config.implementation.max_steps).toBe(40);
     expect(config.commands).toEqual([]);
   });

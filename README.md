@@ -47,12 +47,12 @@ only GitHub Actions and one model provider.
 From a target repository:
 
 ```bash
-npx --yes github:hwong103/github-ai-agent-framework install \
+npx --yes github:hwong103/github-ai-agent-framework#v0.1.0 install \
   --target . \
-  --framework-ref main
+  --framework-ref v0.1.0
 ```
 
-For production, replace `main` with a release tag or full commit SHA. The
+`v0.1.0` is an immutable release tag; a full commit SHA is also supported. The
 installer does not overwrite existing files unless `--force true` is supplied.
 
 Then:
@@ -105,8 +105,8 @@ The model can request only:
 
 There is no arbitrary shell tool. Commands are exact configuration entries, are
 launched with `shell: false`, and receive a minimal environment with model
-provider and GitHub credentials removed. At least one required command must be
-classified as `test`.
+provider and GitHub credentials removed. Required `format`, `lint`, and `test`
+commands are mandatory.
 
 ## Repository contract
 
@@ -134,6 +134,8 @@ The full configuration reference is in
 - The write-capable publisher does not execute target repository code.
 - PRs are always created with `draft: true`; no merge API exists in the
   framework.
+- Framework release refs and third-party Actions are pinned; installed wrappers
+  default to the immutable `v0.1.0` release.
 
 Read [SECURITY.md](SECURITY.md) before enabling implementation in a sensitive
 repository.

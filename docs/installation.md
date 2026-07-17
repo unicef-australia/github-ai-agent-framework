@@ -12,12 +12,12 @@
 Run this in the target repository:
 
 ```bash
-npx --yes github:hwong103/github-ai-agent-framework install \
+npx --yes github:hwong103/github-ai-agent-framework#v0.1.0 install \
   --target . \
-  --framework-ref main
+  --framework-ref v0.1.0
 ```
 
-Use a release tag or full commit SHA instead of `main` for a stable production
+Use an immutable release tag or full commit SHA for a stable production
 installation. The command creates:
 
 ```text
@@ -46,7 +46,8 @@ Implementation fails closed when `AGENTS.md` is absent.
 
 Edit `.github/agent.yml`. Commands are not shell fragments selected by the
 model. Each entry is a trusted, exact command selected by name and launched
-without a shell. At least one required `kind: test` command is mandatory.
+without a shell. Required `kind: format`, `kind: lint`, and `kind: test`
+commands are mandatory.
 
 Start with dependency and workflow changes disabled. Increase patch limits only
 after reviewing real workloads.

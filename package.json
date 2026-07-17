@@ -14,7 +14,7 @@
     "dist",
     "agent/prompts",
     "templates",
-    "scripts/install.mjs",
+    "scripts/copy-assets.mjs",
     "README.md",
     "LICENSE"
   ],

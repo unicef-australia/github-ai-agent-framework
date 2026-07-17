@@ -5,8 +5,7 @@ import type {
   ProviderEnvironment,
 } from "../types.js";
 import {
-  chatCompletionSchema,
-  readProviderJson,
+  performOpenAICompatibleChat,
   requiredEnvironmentValue,
 } from "./http.js";
 
@@ -23,38 +22,15 @@ export class OpenAIProvider implements AIProvider {
     const baseUrl = (
       this.environment.OPENAI_BASE_URL ?? "https://api.openai.com/v1"
     ).replace(/\/$/, "");
-    const response = await this.fetcher(`${baseUrl}/chat/completions`, {
-      method: "POST",
+    return performOpenAICompatibleChat({
+      providerName: this.name,
+      url: `${baseUrl}/chat/completions`,
       headers: {
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({
-        model: request.model,
-        messages: request.messages,
-        max_completion_tokens: request.max_tokens,
-        temperature: request.temperature,
-        ...(request.response_format === "json"
-          ? { response_format: { type: "json_object" } }
-          : {}),
-      }),
+      request,
+      fetcher: this.fetcher,
     });
-    const parsed = chatCompletionSchema.parse(
-      await readProviderJson(response, this.name),
-    );
-    const first = parsed.choices[0];
-    if (!first) {
-      throw new Error("openai returned no completion");
-    }
-    return {
-      content: first.message.content,
-      ...(parsed.model ? { model: parsed.model } : {}),
-      ...(parsed.usage?.prompt_tokens === undefined
-        ? {}
-        : { input_tokens: parsed.usage.prompt_tokens }),
-      ...(parsed.usage?.completion_tokens === undefined
-        ? {}
-        : { output_tokens: parsed.usage.completion_tokens }),
-    };
   }
 }

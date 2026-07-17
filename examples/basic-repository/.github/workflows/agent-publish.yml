@@ -14,7 +14,7 @@ on:
 
 jobs:
   publish:
-    uses: hwong103/github-ai-agent-framework/.github/workflows/publish.yml@main
+    uses: hwong103/github-ai-agent-framework/.github/workflows/publish.yml@v0.1.0
     permissions:
       actions: read
       contents: write
@@ -23,4 +23,4 @@ jobs:
     with:
       issue-number: ${{ inputs.issue-number }}
       implementation-run-id: ${{ inputs.implementation-run-id }}
-      framework-ref: main
+      framework-ref: v0.1.0

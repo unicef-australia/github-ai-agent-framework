@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { runTriage } from "./core/triage.js";
@@ -12,9 +12,13 @@ import {
 } from "./core/publisher.js";
 import { createProvider } from "./providers/registry.js";
 import { loadAgentConfig } from "./config/load.js";
-import { issueContextFromEvent } from "./validation/events.js";
+import {
+  humanApprovalFromEvent,
+  issueContextFromEvent,
+} from "./validation/events.js";
 import { validateTriageArtifact } from "./validation/artifacts.js";
 import { installFramework } from "./install.js";
+import { assertCurrentHumanApproval } from "./github/approval.js";
 
 interface Arguments {
   readonly command: string;
@@ -46,7 +50,12 @@ function required(
 }
 
 async function readJson(path: string): Promise<unknown> {
-  return JSON.parse(await readFile(resolve(path), "utf8")) as unknown;
+  const absolute = resolve(path);
+  const details = await stat(absolute);
+  if (details.size > 5_000_000) {
+    throw new Error(`JSON input exceeds 5 MB: ${absolute}`);
+  }
+  return JSON.parse(await readFile(absolute, "utf8")) as unknown;
 }
 
 async function writeJson(path: string, value: unknown): Promise<void> {
@@ -97,9 +106,8 @@ async function implement(
   options: Readonly<Record<string, string>>,
 ): Promise<void> {
   const repositoryRoot = resolve(required(options, "repo"));
-  const event = issueContextFromEvent(
-    await readJson(required(options, "event")),
-  );
+  const rawEvent = await readJson(required(options, "event"));
+  const event = issueContextFromEvent(rawEvent);
   const repository = options.repository ?? event.repository;
   if (!repository)
     throw new Error("--repository is required when absent from event");
@@ -108,6 +116,7 @@ async function implement(
     outputDirectory: resolve(required(options, "output")),
     repository,
     issue: event.issue,
+    approval: humanApprovalFromEvent(rawEvent),
   });
 }
 
@@ -175,10 +184,24 @@ async function install(
 ): Promise<void> {
   const results = await installFramework({
     target: options.target ?? ".",
-    frameworkRef: options["framework-ref"] ?? "main",
+    frameworkRef: options["framework-ref"] ?? "v0.1.0",
     force: options.force === "true",
   });
   console.log(JSON.stringify(results, null, 2));
+}
+
+async function checkApproval(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  const identity = expectedIdentity(options);
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) throw new Error("GITHUB_TOKEN is required");
+  const approval = await assertCurrentHumanApproval({
+    repository: identity.repository,
+    issueNumber: identity.issue_number,
+    token,
+  });
+  console.log(`Human approval confirmed for ${approval.actor}`);
 }
 
 async function main(): Promise<void> {
@@ -186,6 +209,9 @@ async function main(): Promise<void> {
   switch (command) {
     case "install":
       await install(options);
+      break;
+    case "check-approval":
+      await checkApproval(options);
       break;
     case "triage":
       await triage(options);

@@ -37,7 +37,15 @@ export const agentConfigSchema = z
         allow_workflow_changes: z.boolean().default(false),
         protected_paths: z
           .array(z.string().trim().min(1))
-          .default([".github/workflows/", ".env", ".env.*", ".git"]),
+          .default([
+            ".github/workflows/",
+            ".github/agent.yml",
+            "AGENTS.md",
+            "*/AGENTS.md",
+            ".env",
+            ".env.*",
+            ".git",
+          ]),
       })
       .strict(),
     commands: z.array(commandSchema).default([]),
@@ -59,3 +67,18 @@ export const agentConfigSchema = z
 export type AgentConfig = z.infer<typeof agentConfigSchema>;
 export type AgentCommand = z.infer<typeof commandSchema>;
 export type ProviderStageConfig = z.infer<typeof providerStageSchema>;
+
+export function validateRequiredCommandKinds(config: AgentConfig): void {
+  const requiredKinds = new Set(
+    config.commands
+      .filter((command) => command.required)
+      .map((command) => command.kind),
+  );
+  const required = ["format", "lint", "test"] as const;
+  const missing = required.filter((kind) => !requiredKinds.has(kind));
+  if (missing.length > 0) {
+    throw new Error(
+      `Required command kinds are missing: ${missing.join(", ")}`,
+    );
+  }
+}

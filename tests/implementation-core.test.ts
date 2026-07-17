@@ -10,17 +10,19 @@ import {
   validateBundleForPublish,
   verifyImplementationBundle,
 } from "../agent/core/publisher.js";
-import type { AIProvider, ChatResponse } from "../agent/types.js";
+import type { AIProvider, ChatRequest, ChatResponse } from "../agent/types.js";
 
 const execute = promisify(execFile);
 
 class SequenceProvider implements AIProvider {
   readonly name = "fixed";
   private index = 0;
+  readonly requests: ChatRequest[] = [];
 
   constructor(private readonly responses: readonly string[]) {}
 
-  chat(): Promise<ChatResponse> {
+  chat(request: ChatRequest): Promise<ChatResponse> {
+    this.requests.push(request);
     const content = this.responses[this.index];
     this.index += 1;
     if (!content) return Promise.reject(new Error("Unexpected provider call"));
@@ -43,6 +45,10 @@ describe("runImplementation", () => {
       join(root, "AGENTS.md"),
       "Run the configured test command.",
     );
+    await writeFile(
+      join(root, "src", "AGENTS.md"),
+      "Files under src follow the nested instruction.\n",
+    );
     await writeFile(join(root, "src", "value.txt"), "old\n");
     await writeFile(join(root, "verify.mjs"), "process.exit(0)\n");
     await writeFile(
@@ -57,6 +63,14 @@ limits:
   allow_dependency_changes: false
   allow_workflow_changes: false
 commands:
+  - name: format
+    kind: format
+    run: node verify.mjs
+    required: true
+  - name: lint
+    kind: lint
+    run: node verify.mjs
+    required: true
   - name: test
     kind: test
     run: node verify.mjs
@@ -103,11 +117,19 @@ commands:
         labels: ["agent-approved"],
         author: "octocat",
       },
+      approval: {
+        label: "agent-approved",
+        actor: "reviewer",
+        actor_type: "User",
+      },
       provider,
       now: () => new Date("2026-07-17T00:00:00.000Z"),
     });
 
     expect(report.verification.passed).toBe(true);
+    expect(provider.requests[0]?.messages.at(-1)?.content).toContain(
+      "Files under src follow the nested instruction.",
+    );
     expect(report.changed_files).toEqual(["src/value.txt"]);
     expect(
       await readFile(join(output, "implementation.patch"), "utf8"),

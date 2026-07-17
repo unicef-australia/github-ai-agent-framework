@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { lstat, readFile, readdir, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 
 import { assertReadablePath } from "../validation/paths.js";
@@ -35,8 +35,10 @@ export async function searchCode(
       if (!entry.isFile()) continue;
       let content: string;
       try {
+        const details = await stat(child);
+        if (details.size > 1_000_000) continue;
         const buffer = await readFile(child);
-        if (buffer.byteLength > 1_000_000 || buffer.includes(0)) continue;
+        if (buffer.includes(0)) continue;
         content = buffer.toString("utf8");
       } catch {
         continue;
@@ -50,12 +52,11 @@ export async function searchCode(
     }
   }
 
-  const stats = await import("node:fs/promises").then(({ lstat }) =>
-    lstat(start),
-  );
+  const stats = await lstat(start);
   if (stats.isDirectory()) {
     await visit(start);
   } else {
+    if (stats.size > 1_000_000) return "File exceeds the 1 MB search limit";
     const content = await readFile(start, "utf8");
     for (const [index, line] of content.split("\n").entries()) {
       if (line.includes(query))

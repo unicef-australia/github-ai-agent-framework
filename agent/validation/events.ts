@@ -7,6 +7,12 @@ const eventLabelSchema = z.union([
 
 export const githubIssueEventSchema = z
   .object({
+    action: z.string().optional(),
+    label: z.object({ name: z.string() }).passthrough().optional(),
+    sender: z
+      .object({ login: z.string(), type: z.string() })
+      .passthrough()
+      .optional(),
     repository: z.object({ full_name: z.string() }).passthrough().optional(),
     issue: z
       .object({
@@ -26,6 +32,30 @@ export interface IssueContext {
   readonly body: string;
   readonly labels: readonly string[];
   readonly author: string;
+}
+
+export interface HumanApproval {
+  readonly label: "agent-approved";
+  readonly actor: string;
+  readonly actor_type: "User";
+}
+
+export function humanApprovalFromEvent(event: unknown): HumanApproval {
+  const parsed = githubIssueEventSchema.parse(event);
+  if (
+    parsed.action !== "labeled" ||
+    parsed.label?.name !== "agent-approved" ||
+    parsed.sender?.type !== "User"
+  ) {
+    throw new Error(
+      "Implementation must be triggered by a human applying agent-approved",
+    );
+  }
+  return {
+    label: "agent-approved",
+    actor: parsed.sender.login,
+    actor_type: "User",
+  };
 }
 
 export function issueContextFromEvent(event: unknown): {
