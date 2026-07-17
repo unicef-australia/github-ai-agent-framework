@@ -42,6 +42,39 @@ The longer-term GitHub App → Worker → Queue architecture is compatible with 
 core interfaces, but is deliberately not required by this release. Phase 1 needs
 only GitHub Actions and one model provider.
 
+## Install with a coding agent
+
+Copy this prompt into Codex, Claude Code, or another coding agent while it is
+working in the repository you want to configure:
+
+```text
+Install the GitHub AI Agent Framework into this repository using the immutable
+v0.1.1 release from hwong103/github-ai-agent-framework.
+
+1. Inspect this repository before changing anything. Read every applicable
+   AGENTS.md, the project documentation, package scripts, and existing GitHub
+   workflows.
+2. Run:
+   npx --yes github:hwong103/github-ai-agent-framework#v0.1.1 install \
+     --target . --framework-ref v0.1.1
+3. Do not use --force or overwrite existing files. If an installed file
+   conflicts with an existing file, merge the required content carefully.
+4. Customize .github/agent.yml for this repository. Configure the provider,
+   models, context paths, limits, protected paths, and exact allow-listed
+   format, lint, test, and build commands that this project actually supports.
+5. Complete or merge AGENTS.md with the real architecture, conventions, test
+   commands, prohibited changes, and deployment rules for this repository.
+6. Preserve the security boundaries: human agent-approved label, read-only
+   implementation permissions, protected workflow and environment files,
+   Draft PRs only, and no automatic merging.
+7. Never write provider tokens or GitHub credentials into the repository.
+   Report the repository secrets that a human still needs to configure.
+8. Validate the resulting YAML and run the repository's formatting, linting,
+   tests, and build. Fix installation-related failures where safe.
+9. Show the final diff and summarize installed files, validation results,
+   required secrets, and remaining manual steps. Do not push unless asked.
+```
+
 ## Quick start
 
 From a target repository:
