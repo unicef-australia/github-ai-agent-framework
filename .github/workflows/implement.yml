@@ -1,0 +1,82 @@
+name: Reusable approved issue implementation
+
+on:
+  workflow_call:
+    inputs:
+      issue-number:
+        description: Human-approved issue number
+        required: true
+        type: number
+      framework-ref:
+        description: Immutable framework tag or SHA
+        required: false
+        default: main
+        type: string
+    secrets:
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_AI_GATEWAY_ID:
+        required: false
+      OPENAI_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+
+jobs:
+  implement:
+    name: Build tested patch without write credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Check out target repository
+        uses: actions/checkout@v4
+        with:
+          path: target
+          persist-credentials: false
+
+      - name: Check out trusted framework
+        uses: actions/checkout@v4
+        with:
+          repository: hwong103/github-ai-agent-framework
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: framework/package-lock.json
+
+      - name: Build framework
+        working-directory: framework
+        run: npm ci && npm run build
+
+      - name: Run controlled implementation agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_AI_GATEWAY_ID: ${{ secrets.CLOUDFLARE_AI_GATEWAY_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: >-
+          node framework/dist/agent/cli.js implement --repo target --event
+          "$GITHUB_EVENT_PATH" --repository "$GITHUB_REPOSITORY" --output
+          artifacts
+
+      - name: Upload implementation bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: implementation-${{ inputs.issue-number }}
+          path: |
+            artifacts/implementation.patch
+            artifacts/pr-body.md
+            artifacts/report.json
+          if-no-files-found: error
+          retention-days: 14

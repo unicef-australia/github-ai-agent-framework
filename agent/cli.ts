@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { runTriage } from "./core/triage.js";
+import { runImplementation } from "./core/implementation.js";
 import { createProvider } from "./providers/registry.js";
 import { loadAgentConfig } from "./config/load.js";
 import { issueContextFromEvent } from "./validation/events.js";
@@ -85,11 +86,32 @@ async function validateTriage(
   await writeJson(required(options, "output"), artifact);
 }
 
+async function implement(
+  options: Readonly<Record<string, string>>,
+): Promise<void> {
+  const repositoryRoot = resolve(required(options, "repo"));
+  const event = issueContextFromEvent(
+    await readJson(required(options, "event")),
+  );
+  const repository = options.repository ?? event.repository;
+  if (!repository)
+    throw new Error("--repository is required when absent from event");
+  await runImplementation({
+    repositoryRoot,
+    outputDirectory: resolve(required(options, "output")),
+    repository,
+    issue: event.issue,
+  });
+}
+
 async function main(): Promise<void> {
   const { command, options } = parseArguments(process.argv.slice(2));
   switch (command) {
     case "triage":
       await triage(options);
+      break;
+    case "implement":
+      await implement(options);
       break;
     case "validate-triage":
       await validateTriage(options);

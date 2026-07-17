@@ -1,0 +1,21 @@
+name: AI approved issue implementation
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: ai-implement-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event.label.name == 'agent-approved'
+    uses: hwong103/github-ai-agent-framework/.github/workflows/implement.yml@main
+    permissions:
+      contents: read
+      issues: read
+    with:
+      issue-number: ${{ github.event.issue.number }}
+      framework-ref: main
+    secrets: inherit

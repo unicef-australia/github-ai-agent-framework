@@ -50,3 +50,52 @@ export function validateTriageArtifact(
   }
   return artifact;
 }
+
+export const implementationReportSchema = z
+  .object({
+    schema_version: z.literal(1),
+    repository: z.string().regex(/^[^/]+\/[^/]+$/),
+    issue_number: z.number().int().positive(),
+    base_sha: z.string().regex(/^[0-9a-f]{40}$/),
+    generated_at: z.iso.datetime(),
+    provider: z.string().min(1),
+    model: z.string().min(1),
+    pr_title: z.string().min(1).max(200),
+    summary: z.string().min(1).max(4_000),
+    plan: z.object({
+      schema_version: z.literal(1),
+      summary: z.string(),
+      steps: z.array(z.string()),
+      files_to_inspect: z.array(z.string()),
+      tests: z.array(z.string()),
+    }),
+    changed_files: z.array(z.string()).min(1),
+    patch: z.object({
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      lines: z.number().int().positive(),
+    }),
+    verification: z.object({
+      passed: z.literal(true),
+      commands: z.array(
+        z.object({
+          name: z.string(),
+          kind: z.string(),
+          run: z.string(),
+          exit_code: z.number().int(),
+          duration_ms: z.number().nonnegative(),
+          output: z.string(),
+        }),
+      ),
+    }),
+    policy: z.object({
+      max_changed_files: z.number().int().positive(),
+      max_patch_lines: z.number().int().positive(),
+      allow_dependency_changes: z.boolean(),
+      allow_workflow_changes: z.boolean(),
+    }),
+    testing_notes: z.array(z.string()),
+    risks: z.array(z.string()),
+  })
+  .strict();
+
+export type ImplementationReport = z.infer<typeof implementationReportSchema>;

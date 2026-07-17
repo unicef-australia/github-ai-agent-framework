@@ -16,6 +16,7 @@ const implementationStageSchema = providerStageSchema.extend({
 export const commandSchema = z
   .object({
     name: z.string().regex(/^[a-z][a-z0-9_-]*$/),
+    kind: z.enum(["install", "format", "lint", "test", "build", "custom"]),
     run: z.string().trim().min(1).max(500),
     required: z.boolean().default(true),
     timeout_minutes: z.number().int().positive().max(30).default(10),
