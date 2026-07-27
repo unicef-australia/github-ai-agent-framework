@@ -30,7 +30,7 @@ jobs:
       - name: Check out trusted framework
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          repository: hwong103/github-ai-agent-framework
+          repository: unicef-australia/github-ai-agent-framework
           ref: ${{ inputs.framework-ref }}
           path: framework
           persist-credentials: false
@@ -127,7 +127,7 @@ jobs:
       - name: Check out trusted framework
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          repository: hwong103/github-ai-agent-framework
+          repository: unicef-australia/github-ai-agent-framework
           ref: ${{ inputs.framework-ref }}
           path: framework
           persist-credentials: false
