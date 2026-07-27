@@ -137,7 +137,7 @@ export async function runImplementation(
       { role: "system", content: system },
       {
         role: "user",
-        content: `${issueAndContext}\n\nReturn a plan object with schema_version, summary, steps, files_to_inspect, and tests. Do not use tools yet.`,
+        content: `${issueAndContext}\n\nReturn ONLY a JSON object matching this exact shape:\n{"schema_version":1,"summary":"one paragraph","steps":["first step","second step"],"files_to_inspect":["path/to/file.ts"],"tests":["what to verify"]}\n\nRules:\n- schema_version MUST be the number 1.\n- steps, files_to_inspect and tests MUST be arrays of plain strings. Never use objects for their entries.\n- Include no keys beyond the five shown above.\n- Do NOT request a tool yet. Tool requests come after this plan is accepted; returning a {"type":"tool",...} object here is invalid.`,
       },
     ],
   });
